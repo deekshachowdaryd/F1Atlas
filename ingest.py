@@ -102,15 +102,15 @@ def _load_articles():
             f"files (see the docstring at the top of ingest.py for the format)."
         )
 
-    # JSON articles (entities.json / relations.json are graph config, not articles)
-    for path in sorted(RAW_ARTICLES_DIR.rglob("*.json")):
+    # load json articles, skip graph config
+    for path in sorted(RAW_ARTICLES_DIR.glob("*.json")):
         if path.name in ("entities.json", "relations.json"):
             continue
         with open(path, "r", encoding="utf-8") as f:
             articles.append(json.load(f))
 
-    # Scraped .txt articles (ARTICLE/CATEGORY/URL header + ## headings)
-    txt_paths = sorted(RAW_ARTICLES_DIR.rglob("*.txt"))
+    # load scraped txt articles
+    txt_paths = sorted(RAW_ARTICLES_DIR.glob("*.txt"))
     for path in txt_paths:
         try:
             articles.append(parse_txt_file(path))
@@ -186,7 +186,7 @@ def build_vector_store(chunks, model: SentenceTransformer):
             "season_end": season[1] if season else 0,
         })
 
-    # Chroma has a batch-size limit; insert in chunks of 500 to be safe.
+    # add to chroma in batches
     BATCH = 500
     for i in range(0, len(ids), BATCH):
         collection.add(

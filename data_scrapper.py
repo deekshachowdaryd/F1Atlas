@@ -47,9 +47,7 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup, NavigableString, Tag
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
+# config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,36 +61,33 @@ WIKI_API      = "https://en.wikipedia.org/w/api.php"
 HEADERS       = {
     "User-Agent": "F1HistorianAI/1.0 (educational project; contact@example.com)"
 }
-REQUEST_DELAY = 5.0   # seconds between requests — be polite to Wikipedia
+REQUEST_DELAY = 5.0   # delay to be polite to wiki api
 MAX_RETRIES   = 4
 BACKOFF_BASE  = 20.0
 
-# Tags/classes we strip out entirely before extracting text — pure UI chrome,
-# not content.
+# selectors to remove from html
 STRIP_SELECTORS = [
-    ".mw-editsection",       # [edit] links
-    ".noprint",               # print-hidden chrome
-    ".navbox",                 # bottom navigation boxes
+    ".mw-editsection",       # edit links
+    ".noprint",               # print hidden elements
+    ".navbox",                 # navigation boxes
     ".vertical-navbox",
-    ".sistersitebox",         # "Wikimedia Commons has media..." boxes
-    ".ambox",                  # "this article needs..." banners
-    ".hatnote",                # "Main article: X" disambiguation notes
+    ".sistersitebox",         # sister site links
+    ".ambox",                  # article warning banners
+    ".hatnote",                # disambiguation notes
     ".mw-empty-elt",
     ".reflist-lower-alpha",
-    "sup.reference",          # inline [1][2][3] citation markers
+    "sup.reference",          # citation markers
     ".mw-cite-backlink",
-    ".thumb",                  # image captions/thumbnails (no useful text)
+    ".thumb",                  # image thumbnails
     "style",
     "script",
 ]
 
-# ---------------------------------------------------------------------------
-# Articles to scrape
-# ---------------------------------------------------------------------------
+# articles to scrape
 
 ALL_ARTICLES = {
     "DRIVERS": [
-        # --- Historical ---
+        # historical
         "Ayrton Senna",
         "Alain Prost",
         "Nigel Mansell",
@@ -109,10 +104,6 @@ ALL_ARTICLES = {
         "David Coulthard",
         "Rubens Barrichello",
         "Nico Rosberg",
-        # --- 2025 season grid (last season) + 2026 grid (current season) ---
-        # Most of these drivers span both seasons; season-specific swaps
-        # (e.g. Tsunoda/Lawson mid-2025, Doohan/Colapinto mid-2025) are all
-        # included below so both grids are fully covered.
         "Lewis Hamilton",
         "Sebastian Vettel",
         "Fernando Alonso",
@@ -139,9 +130,7 @@ ALL_ARTICLES = {
         "Nico Hülkenberg",
         "Sergio Pérez",
         "Valtteri Bottas",
-        # --- New for 2026 ---
         "Arvid Lindblad",
-        # --- Notable reserve/test drivers (useful context, e.g. mid-season swaps) ---
         "Jack Doohan",
     ],
     "TEAMS": [
@@ -158,13 +147,12 @@ ALL_ARTICLES = {
         "Brawn GP",
         "Honda in Formula One",
         "Aston Martin in Formula One",
-        # --- Current grid additions (2025/2026) ---
-        "Racing Bulls",              # ex Toro Rosso / AlphaTauri / RB
+        "Racing Bulls",              
         "Alpine F1 Team",
         "Haas F1 Team",
-        "Kick Sauber",               # 2024-2025 identity, transitioned into Audi for 2026
-        "Audi in Formula One",       # new works team for 2026
-        "Cadillac F1 Team",          # new entrant for 2026
+        "Kick Sauber",               
+        "Audi in Formula One",       
+        "Cadillac F1 Team",          
     ],
     "SEASONS": [
         "1976 Formula One season",
@@ -191,7 +179,6 @@ ALL_ARTICLES = {
         "2010 Formula One World Championship",
         "2011 Formula One World Championship",
         "2012 Formula One World Championship",
-        # --- Previously-skipped years, filled in for an unbroken record ---
         "2013 Formula One World Championship",
         "2014 Formula One World Championship",
         "2015 Formula One World Championship",
@@ -203,7 +190,6 @@ ALL_ARTICLES = {
         "2021 Formula One World Championship",
         "2022 Formula One World Championship",
         "2023 Formula One World Championship",
-        # --- Last season + current season ---
         "2024 Formula One World Championship",
         "2025 Formula One World Championship",
         "2026 Formula One World Championship",
@@ -220,7 +206,6 @@ ALL_ARTICLES = {
         "Hockenheimring",
         "Bahrain International Circuit",
         "Yas Marina Circuit",
-        # --- Modern-calendar circuits missing from the original list ---
         "Baku City Circuit",
         "Jeddah Corniche Circuit",
         "Miami International Autodrome",
@@ -234,7 +219,6 @@ ALL_ARTICLES = {
         "Hill-Schumacher rivalry",
         "Hamilton–Rosberg rivalry",
         "Verstappen–Hamilton rivalry",
-        # --- Current-era title fight (2024-2025 McLaren/Red Bull battle) ---
         "Norris–Piastri rivalry",
     ],
     "TECHNICAL": [
@@ -245,7 +229,6 @@ ALL_ARTICLES = {
         "Formula One tyres",
         "Ground effect (cars)",
         "Formula One aerodynamics",
-        # --- 2026 regulation reset is a major context shift for current-era Qs ---
         "Formula One engines",
         "2026 Formula One regulations",
     ],
@@ -255,15 +238,12 @@ ALL_ARTICLES = {
         "List of Formula One World Constructors' Champions",
         "History of Formula One",
         "Formula One safety",
-        # --- Useful cross-reference / current-grid index pages ---
         "List of Formula One drivers",
         "List of Formula One constructors",
     ],
 }
 
-# ---------------------------------------------------------------------------
-# Wikipedia fetch (full rendered HTML via action=parse)
-# ---------------------------------------------------------------------------
+# wikipedia api fetch helper
 
 def fetch_article_html(title: str) -> tuple[str, str]:
     """
@@ -330,9 +310,7 @@ def fetch_article_html(title: str) -> tuple[str, str]:
     return "", ""
 
 
-# ---------------------------------------------------------------------------
-# HTML → structured text
-# ---------------------------------------------------------------------------
+# html parsing helpers
 
 def _clean_cell_text(tag: Tag) -> str:
     """Get readable text from a table cell, collapsing whitespace."""
@@ -361,7 +339,7 @@ def _infobox_to_text(table: Tag) -> str:
             if key and val:
                 lines.append(f"{key}: {val}")
         elif header_cell and not data_cells:
-            # Section divider row inside infobox, e.g. "Career"
+            # infobox section divider
             key = _clean_cell_text(header_cell)
             if key:
                 lines.append(f"-- {key} --")
@@ -401,7 +379,7 @@ def _list_to_text(list_tag: Tag, indent: int = 0) -> str:
     ordered = list_tag.name == "ol"
     idx = 1
     for li in list_tag.find_all("li", recursive=False):
-        # Get this <li>'s own text, excluding nested list text
+        # get text excluding nested list text
         nested_lists = li.find_all(["ul", "ol"], recursive=False)
         li_copy_text_parts = []
         for child in li.children:
@@ -449,23 +427,20 @@ def html_to_structured_text(html: str) -> str:
     """
     soup = BeautifulSoup(html, "html.parser")
 
-    # Strip pure UI chrome we never want.
+    # remove ui elements
     for selector in STRIP_SELECTORS:
         for el in soup.select(selector):
             el.decompose()
 
     body = soup.find(class_="mw-parser-output") or soup
 
-    # Pull infoboxes out first (they live at the top, often inside the
-    # first paragraph block) so they appear first in the output even
-    # though we'll also skip them in the main walk.
+    # extract infoboxes first
     infobox_blocks = []
     for table in body.select("table.infobox"):
         infobox_blocks.append(_infobox_to_text(table))
         table.decompose()
 
-    # Pull the references section out separately and remove it from the
-    # main walk (it duplicates a heading + reflist we'd otherwise mangle).
+    # extract references separately
     references_text = extract_references(body)
     for ref_section in body.select(".reflist, ol.references"):
         ref_section.decompose()
@@ -481,7 +456,7 @@ def html_to_structured_text(html: str) -> str:
         _walk(el, out_lines, heading_tags, skip_state={"skip": False})
 
     body_text = "\n".join(out_lines)
-    # Collapse excess blank lines
+    # collapse duplicate blank lines
     body_text = re.sub(r"\n{3,}", "\n\n", body_text).strip()
 
     parts = []
@@ -539,7 +514,7 @@ def _walk(el: Tag, out: list, heading_tags: set, skip_state: dict) -> None:
             _walk(child, out, heading_tags, skip_state)
         return
 
-    # Fallback: any other block-level container — just grab its text.
+    # fallback for other containers
     if name in ("dl", "blockquote", "figure"):
         text = el.get_text(" ", strip=True)
         text = re.sub(r"\s+", " ", text).strip()
@@ -547,9 +522,7 @@ def _walk(el: Tag, out: list, heading_tags: set, skip_state: dict) -> None:
             out.append(text)
 
 
-# ---------------------------------------------------------------------------
-# Text cleaning
-# ---------------------------------------------------------------------------
+# text cleaning
 
 def clean(text: str) -> str:
     text = re.sub(r"\[citation needed\]", "", text, flags=re.IGNORECASE)
@@ -559,9 +532,7 @@ def clean(text: str) -> str:
     return "\n".join(lines).strip()
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+# main execution
 
 def slugify(title: str) -> str:
     """Convert an article title to a safe filename: 'Ayrton Senna' → 'ayrton_senna'."""

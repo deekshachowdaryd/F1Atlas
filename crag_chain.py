@@ -36,11 +36,11 @@ class CRAGResult:
     sub_queries: list = field(default_factory=list)
     passages: list = field(default_factory=list)
     entities: list = field(default_factory=list)
-    retrieval_confidence: str = ""      # 'CORRECT' | 'AMBIGUOUS' | 'INCORRECT'
+    retrieval_confidence: str = ""      # correct, ambiguous, or incorrect
     used_web_search: bool = False
 
 
-RAGResult = CRAGResult  # backwards-compatible alias
+RAGResult = CRAGResult  # alias for backwards compatibility
 
 
 class F1CRAGChain:
@@ -64,9 +64,7 @@ class F1CRAGChain:
         self._graph = load_graph()
         log.info("F1CRAGChain ready")
 
-    # -----------------------------------------------------------------
-    # Cache
-    # -----------------------------------------------------------------
+    # cache
     def _load_cache(self) -> dict:
         if not os.path.exists(CACHE_PATH):
             return {}
@@ -99,9 +97,7 @@ class F1CRAGChain:
         except Exception as e:
             log.warning(f"Failed to save cache: {e}")
 
-    # -----------------------------------------------------------------
-    # Main entrypoint
-    # -----------------------------------------------------------------
+    # main entrypoint
     def run(self, question: str) -> CRAGResult:
         log.info(f"Question: {question!r}")
 
@@ -144,7 +140,7 @@ class F1CRAGChain:
         elif confidence == "INCORRECT":
             refined_docs = []
             log.info("CRAG: local retrieval discarded, no web search fallback configured")
-        else:  # AMBIGUOUS
+        else:  # ambiguous
             refined_docs = self._refine_knowledge(question, top_docs, doc_scores)
             log.info("CRAG: local retrieval is ambiguous, using refined local knowledge only")
 
@@ -160,9 +156,7 @@ class F1CRAGChain:
         self._save_to_cache(normalized, result)
         return result
 
-    # -----------------------------------------------------------------
-    # Decomposition
-    # -----------------------------------------------------------------
+    # decomposition
     _DECOMPOSE_SYSTEM = (
         "You are a Formula One research assistant.\n"
         "Break the user's question into 2-4 concise, atomic sub-queries that together\n"
@@ -234,9 +228,7 @@ class F1CRAGChain:
         ranked = sorted(zip(scores, docs), key=lambda x: x[0], reverse=True)
         return [doc for _, doc in ranked[:top_k]]
 
-    # -----------------------------------------------------------------
-    # CRAG: retrieval evaluator
-    # -----------------------------------------------------------------
+    # crag retrieval evaluator
     def _score_pairs(self, question: str, texts: list) -> list:
         if not texts:
             return []
@@ -257,9 +249,7 @@ class F1CRAGChain:
             label = "AMBIGUOUS"
         return label, scores
 
-    # -----------------------------------------------------------------
-    # CRAG: knowledge refinement (decompose -> filter -> recompose)
-    # -----------------------------------------------------------------
+    # crag knowledge refinement
     def _decompose_recompose(self, question: str, text: str) -> str:
         strips = re.split(r"(?<=[.!?])\s+", text.strip())
         strips = [s.strip() for s in strips if len(s.split()) > 3]
@@ -288,9 +278,7 @@ class F1CRAGChain:
             refined.append(RetrievedDoc(chunk_id=doc.chunk_id, text=refined_text, metadata=doc.metadata, score=score))
         return refined
 
-    # -----------------------------------------------------------------
-    # CRAG: web search fallback
-    # -----------------------------------------------------------------
+    # crag web search fallback
     def _web_search(self, question: str) -> str:
         try:
             response = self._client.models.generate_content(

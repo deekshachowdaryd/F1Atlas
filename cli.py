@@ -18,30 +18,30 @@ def ask(chain: F1CRAGChain, question: str):
     result = chain.run(question)
     elapsed = time.time() - start_time
 
-    print("=" * 80)
-    print(f"QUESTION: {question}")
-    print(f"Time Taken: {elapsed:.2f} seconds")
-    print("=" * 80)
-    print(f"Sub-queries Generated: {result.sub_queries}")
-    print(f"Entities Detected: {result.entities if result.entities else 'none'}")
-    print(f"CRAG Confidence: {result.retrieval_confidence or 'n/a (cached)'}")
-    print(f"Web Search Used: {result.used_web_search}")
+    print("-" * 60)
+    print(f"q: {question}")
+    print(f"took: {elapsed:.2f}s")
+    print("-" * 60)
+    print(f"sub-queries: {result.sub_queries}")
+    print(f"entities: {result.entities if result.entities else 'none'}")
+    print(f"crag confidence: {result.retrieval_confidence.lower() if result.retrieval_confidence else 'cached'}")
+    print(f"web search used: {str(result.used_web_search).lower()}")
 
-    print("\n-- Retrieved Docs (Top Reranked) -------------------")
+    print("\n-- retrieved documents --")
     for i, doc in enumerate(result.passages, 1):
-        print(f"  Doc {i}: [Score: {doc.score:.4f}] from '{doc.metadata.get('article_title', 'Unknown')}' - {doc.metadata.get('section_title', 'Unknown')}")
+        print(f"  doc {i}: [score: {doc.score:.4f}] '{doc.metadata.get('article_title', 'unknown')}' - {doc.metadata.get('section_title', 'unknown')}")
         snippet = doc.text.replace("\n", " ")
         if len(snippet) > 120:
             snippet = snippet[:120] + "..."
-        print(f"    Snippet: {snippet}")
+        print(f"    snippet: {snippet}")
 
-    print("\n-- Answer ------------------------------------------")
+    print("\n-- answer --")
     print(result.answer)
-    print("\n-- Sources Cited -----------------------------------")
+    print("\n-- sources --")
     for s in result.sources:
         print(f"  [{s['index']}] {s['title']} - {s['section']}")
         print(f"        {s['url']}")
-    print("=" * 80 + "\n")
+    print("-" * 60 + "\n")
 
 
 def main():
@@ -52,9 +52,9 @@ def main():
         ask(chain, question)
         return
 
-    print("F1 Historian CRAG — interactive mode. Type 'quit' to exit.\n")
+    print("f1 rag cli - interactive mode (type 'quit' to exit)\n")
     while True:
-        question = input("Ask> ").strip()
+        question = input("ask> ").strip()
         if question.lower() in ("quit", "exit"):
             break
         if not question:

@@ -32,9 +32,7 @@ from crag_chain import F1CRAGChain
 
 app = FastAPI(title="F1 Historian CRAG API")
 
-# The frontend is a static HTML file that can be opened from anywhere
-# (file://, a different port, etc.), so we allow all origins. Tighten this
-# to your actual frontend origin if you deploy it somewhere fixed.
+# allow all origins for local static html frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,7 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Loaded once at startup — this is the slow part (~5-10s).
+# loaded on startup
 chain: Optional[F1CRAGChain] = None
 
 
@@ -67,7 +65,7 @@ class QueryRequest(BaseModel):
 def _check_auth(authorization: Optional[str]):
     """Mirrors the frontend's optional 'API Key' field, sent as a Bearer token."""
     if not API_AUTH_TOKEN:
-        return  # no auth configured, allow all requests
+        return  # no auth check needed
     expected = f"Bearer {API_AUTH_TOKEN}"
     if authorization != expected:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")

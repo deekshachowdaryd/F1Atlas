@@ -58,13 +58,13 @@ _HEADER_RE = re.compile(
     re.DOTALL,
 )
 
-# Divider line: a run of box-drawing dashes or plain hyphens (at least 8 long)
+# divider line pattern
 _DIVIDER_RE = re.compile(r"[─\-]{8,}")
 
-# "## Heading" or "### Heading" on its own line
+# heading pattern
 _HEADING_RE = re.compile(r"^(#{2,3})\s+(.+?)\s*$", re.MULTILINE)
 
-# Footnote markers like "[12]" or "[1]"
+# footnote citation pattern
 _FOOTNOTE_RE = re.compile(r"\[\d+\]")
 
 _YEAR_RE = re.compile(r"\b(19[5-9]\d|20[0-2]\d)\b")
@@ -116,7 +116,7 @@ def parse_txt_file(path: Path) -> Dict[str, Any]:
     divider_match = _DIVIDER_RE.search(raw, header_end)
     body = raw[divider_match.end():] if divider_match else raw[header_end:]
 
-    # Find all heading positions
+    # get headings
     headings = list(_HEADING_RE.finditer(body))
 
     sections = []
@@ -136,7 +136,7 @@ def parse_txt_file(path: Path) -> Dict[str, Any]:
     if not headings:
         _add_section("Introduction", body)
     else:
-        # Text before the first heading
+        # content before first heading is intro
         intro = body[:headings[0].start()]
         _add_section("Introduction", intro)
 

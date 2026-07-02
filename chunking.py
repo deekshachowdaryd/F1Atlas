@@ -46,7 +46,7 @@ def split_sentences(text: str) -> List[str]:
 
 
 def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
-    # embeddings are already L2-normalized, so dot product == cosine similarity
+    # embeddings are l2-normalized, so dot product is cosine similarity
     return float(np.dot(a, b))
 
 
@@ -90,8 +90,7 @@ def semantic_chunk(text: str, model: SentenceTransformer) -> List[str]:
 
 
 if __name__ == "__main__":
-    # Quick manual smoke test:
-    #   python chunking.py
+    # quick manual smoke test: python chunking.py
     sample = (
         "Ayrton Senna joined McLaren in 1988. He won the championship that year "
         "after a season-long battle with teammate Alain Prost. The two drivers "
