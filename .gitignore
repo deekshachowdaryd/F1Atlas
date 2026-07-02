@@ -71,3 +71,4 @@ Thumbs.db
 
 # Project-specific local data and indices
 data/
+.env.example
