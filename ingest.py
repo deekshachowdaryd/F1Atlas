@@ -103,14 +103,14 @@ def _load_articles():
         )
 
     # JSON articles (entities.json / relations.json are graph config, not articles)
-    for path in sorted(RAW_ARTICLES_DIR.glob("*.json")):
+    for path in sorted(RAW_ARTICLES_DIR.rglob("*.json")):
         if path.name in ("entities.json", "relations.json"):
             continue
         with open(path, "r", encoding="utf-8") as f:
             articles.append(json.load(f))
 
     # Scraped .txt articles (ARTICLE/CATEGORY/URL header + ## headings)
-    txt_paths = sorted(RAW_ARTICLES_DIR.glob("*.txt"))
+    txt_paths = sorted(RAW_ARTICLES_DIR.rglob("*.txt"))
     for path in txt_paths:
         try:
             articles.append(parse_txt_file(path))
