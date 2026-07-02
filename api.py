@@ -1,25 +1,9 @@
 """
 api.py
-------
-FastAPI server that exposes the CRAG chain over HTTP, in the exact shape
-your f1_historian_frontend.html expects:
 
-  POST /query
-  body: { "query": "...", "history": [ {role, content}, ... ] }
-  response: { "answer": "...", "sources": [ {index, title, section, url}, ... ],
-              "sub_queries": [...], "entities": [...],
-              "retrieval_confidence": "CORRECT|AMBIGUOUS|INCORRECT",
-              "used_web_search": true|false }
-
-The chain is loaded ONCE at startup (it's slow to init: spaCy, cross-encoder,
-retriever DBs, graph) and reused for every request.
-
-RUN:
-    python api.py
-    (or: uvicorn api:app --host 0.0.0.0 --port 8000 --reload)
-
-Then in the frontend's config panel, set the endpoint to:
-    http://localhost:8000/query
+fastapi app to expose the crag chain.
+loads model and data on startup and handles queries via POST /query.
+run with: python api.py (or uvicorn api:app --reload)
 """
 from typing import List, Optional
 
