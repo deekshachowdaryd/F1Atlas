@@ -1,0 +1,109 @@
+"""
+api.py
+------
+FastAPI server that exposes the CRAG chain over HTTP, in the exact shape
+your f1_historian_frontend.html expects:
+
+  POST /query
+  body: { "query": "...", "history": [ {role, content}, ... ] }
+  response: { "answer": "...", "sources": [ {index, title, section, url}, ... ],
+              "sub_queries": [...], "entities": [...],
+              "retrieval_confidence": "CORRECT|AMBIGUOUS|INCORRECT",
+              "used_web_search": true|false }
+
+The chain is loaded ONCE at startup (it's slow to init: spaCy, cross-encoder,
+retriever DBs, graph) and reused for every request.
+
+RUN:
+    python api.py
+    (or: uvicorn api:app --host 0.0.0.0 --port 8000 --reload)
+
+Then in the frontend's config panel, set the endpoint to:
+    http://localhost:8000/query
+"""
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from config import API_AUTH_TOKEN, log
+from crag_chain import F1CRAGChain
+
+app = FastAPI(title="F1 Historian CRAG API")
+
+# The frontend is a static HTML file that can be opened from anywhere
+# (file://, a different port, etc.), so we allow all origins. Tighten this
+# to your actual frontend origin if you deploy it somewhere fixed.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Loaded once at startup — this is the slow part (~5-10s).
+chain: Optional[F1CRAGChain] = None
+
+
+@app.on_event("startup")
+def load_chain():
+    global chain
+    log.info("Loading F1CRAGChain at startup (this takes a few seconds)...")
+    chain = F1CRAGChain()
+    log.info("F1CRAGChain loaded and ready.")
+
+
+class Message(BaseModel):
+    role: str
+    content: str
+
+
+class QueryRequest(BaseModel):
+    query: str
+    history: List[Message] = []
+
+
+def _check_auth(authorization: Optional[str]):
+    """Mirrors the frontend's optional 'API Key' field, sent as a Bearer token."""
+    if not API_AUTH_TOKEN:
+        return  # no auth configured, allow all requests
+    expected = f"Bearer {API_AUTH_TOKEN}"
+    if authorization != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "chain_loaded": chain is not None}
+
+
+@app.post("/query")
+def query(req: QueryRequest, authorization: Optional[str] = Header(default=None)):
+    _check_auth(authorization)
+
+    if chain is None:
+        raise HTTPException(status_code=503, detail="Chain is still loading, try again shortly.")
+
+    if not req.query.strip():
+        raise HTTPException(status_code=400, detail="'query' must not be empty")
+
+    try:
+        result = chain.run(req.query)
+    except Exception as e:
+        log.error(f"Error handling query: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "answer": result.answer,
+        "sources": result.sources,
+        "sub_queries": result.sub_queries,
+        "entities": result.entities,
+        "retrieval_confidence": result.retrieval_confidence,
+        "used_web_search": result.used_web_search,
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=False)

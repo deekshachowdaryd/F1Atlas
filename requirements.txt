@@ -1,0 +1,11 @@
+python-dotenv
+spacy
+numpy
+networkx
+chromadb
+sentence-transformers
+rank_bm25
+google-genai
+fastapi
+uvicorn[standard]
+pydantic

@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 Historian — Race Control AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --asphalt:#0B0D10;
+    --panel:#15181C;
+    --panel-raised:#1C2027;
+    --hairline:#2A2F36;
+    --ivory:#EDEAE3;
+    --ivory-dim:#9AA0A8;
+    --red:#E10600;
+    --red-dim:#7A0500;
+    --amber:#FFB400;
+    --teal:#00D9B5;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  body{
+    background:var(--asphalt);
+    color:var(--ivory);
+    font-family:'Inter', sans-serif;
+    height:100vh;
+    overflow:hidden;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+  }
+
+  .app{
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+  }
+
+  /* ---------- Header / timing tower strip ---------- */
+  .header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 22px;
+    background:var(--panel);
+    border-bottom:2px solid var(--red);
+    flex-shrink:0;
+  }
+
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+
+  .brand-mark{
+    width:10px; height:28px;
+    background:var(--red);
+    transform:skewX(-12deg);
+    flex-shrink:0;
+  }
+
+  .brand-text h1{
+    font-family:'Oswald', sans-serif;
+    font-weight:700;
+    font-size:18px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    line-height:1;
+  }
+
+  .brand-text p{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px;
+    color:var(--ivory-dim);
+    letter-spacing:0.06em;
+    margin-top:4px;
+    text-transform:uppercase;
+  }
+
+  .session-strip{
+    display:flex;
+    align-items:center;
+    gap:18px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+  }
+
+  .status-pill{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:6px 12px;
+    background:var(--panel-raised);
+    border:1px solid var(--hairline);
+    border-radius:2px;
+    cursor:pointer;
+  }
+
+  .status-dot{
+    width:8px; height:8px;
+    border-radius:50%;
+    background:var(--ivory-dim);
+    flex-shrink:0;
+  }
+  .status-dot.live{ background:var(--teal); box-shadow:0 0 8px var(--teal); }
+  .status-dot.off{ background:var(--red); box-shadow:0 0 8px var(--red); }
+
+  .status-label{ text-transform:uppercase; letter-spacing:0.05em; color:var(--ivory-dim); }
+
+  /* ---------- Connection config panel ---------- */
+  .config-panel{
+    display:none;
+    background:var(--panel);
+    border-bottom:1px solid var(--hairline);
+    padding:14px 22px;
+    flex-shrink:0;
+    gap:12px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .config-panel.open{ display:flex; }
+
+  .config-field{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    flex:1;
+    min-width:220px;
+  }
+
+  .config-field label{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--ivory-dim);
+  }
+
+  .config-field input{
+    background:var(--asphalt);
+    border:1px solid var(--hairline);
+    border-radius:2px;
+    padding:9px 10px;
+    color:var(--ivory);
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+  }
+  .config-field input:focus{ outline:none; border-color:var(--red); }
+
+  .btn{
+    font-family:'Oswald', sans-serif;
+    font-weight:600;
+    font-size:12px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    padding:10px 18px;
+    border-radius:2px;
+    border:none;
+    cursor:pointer;
+    transition:filter 0.15s ease;
+  }
+  .btn:hover{ filter:brightness(1.15); }
+  .btn-primary{ background:var(--red); color:var(--ivory); }
+  .btn-ghost{ background:transparent; border:1px solid var(--hairline); color:var(--ivory-dim); }
+
+  /* ---------- Main layout ---------- */
+  .main{
+    flex:1;
+    display:flex;
+    overflow:hidden;
+  }
+
+  .sidebar{
+    width:230px;
+    background:var(--panel);
+    border-right:1px solid var(--hairline);
+    padding:20px 16px;
+    flex-shrink:0;
+    overflow-y:auto;
+  }
+
+  .sidebar h2{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ivory-dim);
+    margin-bottom:12px;
+  }
+
+  .topic-chip{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:var(--panel-raised);
+    border:1px solid var(--hairline);
+    color:var(--ivory);
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    padding:9px 11px;
+    border-radius:2px;
+    margin-bottom:8px;
+    cursor:pointer;
+    transition:border-color 0.15s ease;
+  }
+  .topic-chip:hover{ border-color:var(--red); }
+
+  .sidebar-divider{
+    height:1px;
+    background:var(--hairline);
+    margin:18px 0;
+  }
+
+  .archive-stat{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:var(--ivory-dim);
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:7px;
+  }
+  .archive-stat span:last-child{ color:var(--amber); }
+
+  /* ---------- Chat column ---------- */
+  .chat-col{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  .transcript{
+    flex:1;
+    overflow-y:auto;
+    padding:24px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+
+  .transcript::-webkit-scrollbar{ width:8px; }
+  .transcript::-webkit-scrollbar-thumb{ background:var(--hairline); border-radius:4px; }
+
+  .empty-state{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    gap:10px;
+    color:var(--ivory-dim);
+  }
+  .empty-state .lights{
+    display:flex; gap:8px; margin-bottom:6px;
+  }
+  .empty-state .light{
+    width:14px; height:14px; border-radius:50%;
+    background:var(--hairline);
+  }
+  .empty-state h3{
+    font-family:'Oswald', sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    font-size:16px;
+    color:var(--ivory);
+  }
+  .empty-state p{ font-size:13px; max-width:340px; }
+
+  .msg-row{
+    display:flex;
+    flex-direction:column;
+    max-width:74%;
+  }
+  .msg-row.user{ align-self:flex-end; align-items:flex-end; }
+  .msg-row.ai{ align-self:flex-start; align-items:flex-start; }
+
+  .msg-meta{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    color:var(--ivory-dim);
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin-bottom:6px;
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  .msg-meta .lap-time{ color:var(--teal); }
+
+  .msg-bubble{
+    padding:13px 16px;
+    border-radius:3px;
+    font-size:14.5px;
+    line-height:1.55;
+  }
+  .msg-row.user .msg-bubble{
+    background:var(--red-dim);
+    border:1px solid var(--red);
+    color:var(--ivory);
+  }
+  .msg-row.ai .msg-bubble{
+    background:var(--panel);
+    border:1px solid var(--hairline);
+    border-left:3px solid var(--teal);
+  }
+  .msg-row.ai .msg-bubble.error{
+    border-left:3px solid var(--red);
+  }
+
+  .sources{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:9px;
+  }
+  .source-chip{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px;
+    background:var(--panel-raised);
+    border:1px solid var(--hairline);
+    color:var(--amber);
+    padding:4px 9px;
+    border-radius:2px;
+    text-decoration:none;
+    cursor:pointer;
+  }
+  .source-chip:hover{ border-color:var(--amber); }
+
+  .typing{
+    display:flex; gap:5px; align-items:center; padding:13px 16px;
+  }
+  .typing span{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--teal);
+    animation:pulse 1.1s ease-in-out infinite;
+  }
+  .typing span:nth-child(2){ animation-delay:0.15s; }
+  .typing span:nth-child(3){ animation-delay:0.3s; }
+  @keyframes pulse{ 0%,100%{ opacity:0.25; } 50%{ opacity:1; } }
+
+  /* ---------- Composer ---------- */
+  .composer{
+    border-top:1px solid var(--hairline);
+    background:var(--panel);
+    padding:16px 28px;
+    flex-shrink:0;
+  }
+  .composer-inner{
+    display:flex;
+    gap:10px;
+    align-items:flex-end;
+  }
+  .composer textarea{
+    flex:1;
+    resize:none;
+    background:var(--asphalt);
+    border:1px solid var(--hairline);
+    border-radius:3px;
+    color:var(--ivory);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    padding:12px 14px;
+    max-height:120px;
+    line-height:1.5;
+  }
+  .composer textarea:focus{ outline:none; border-color:var(--red); }
+
+  .send-btn{
+    background:var(--red);
+    color:var(--ivory);
+    border:none;
+    border-radius:3px;
+    padding:12px 20px;
+    font-family:'Oswald', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .send-btn:hover{ filter:brightness(1.15); }
+  .send-btn:disabled{ background:var(--hairline); color:var(--ivory-dim); cursor:not-allowed; filter:none; }
+
+  .composer-hint{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    color:var(--ivory-dim);
+    margin-top:8px;
+  }
+
+  @media (max-width:760px){
+    .sidebar{ display:none; }
+    .msg-row{ max-width:90%; }
+    .session-strip{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div class="header">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-text">
+        <h1>F1 Historian</h1>
+        <p>Race Control AI &middot; Archive Query System</p>
+      </div>
+    </div>
+    <div class="session-strip">
+      <div class="status-pill" id="statusPill" title="Click to configure connection">
+        <div class="status-dot off" id="statusDot"></div>
+        <span class="status-label" id="statusLabel">Not Connected</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="config-panel" id="configPanel">
+    <div class="config-field">
+      <label>Backend Endpoint URL</label>
+      <input type="text" id="endpointInput" placeholder="https://your-rag-api.com/query" />
+    </div>
+    <div class="config-field">
+      <label>API Key (optional)</label>
+      <input type="password" id="apiKeyInput" placeholder="Bearer token, if required" />
+    </div>
+    <button class="btn btn-primary" id="testConnBtn">Test Connection</button>
+    <button class="btn btn-ghost" id="closeConfigBtn">Close</button>
+  </div>
+
+  <div class="main">
+    <div class="sidebar">
+      <h2>Quick Queries</h2>
+      <button class="topic-chip" data-q="Tell me about the Senna–Prost rivalry at McLaren.">Senna vs Prost</button>
+      <button class="topic-chip" data-q="What made the 1988 season so significant?">1988 Season</button>
+      <button class="topic-chip" data-q="Explain how DRS works and when it was introduced.">DRS Explained</button>
+      <button class="topic-chip" data-q="Compare Hamilton and Schumacher's championship records.">Hamilton vs Schumacher</button>
+      <button class="topic-chip" data-q="What happened in the 2021 title fight at Abu Dhabi?">2021 Title Fight</button>
+
+      <div class="sidebar-divider"></div>
+
+      <h2>Session Info</h2>
+      <div class="archive-stat"><span>Messages sent</span><span id="statMsgs">0</span></div>
+      <div class="archive-stat"><span>Avg. response</span><span id="statAvg">—</span></div>
+      <div class="archive-stat"><span>Endpoint</span><span id="statEndpoint">none</span></div>
+    </div>
+
+    <div class="chat-col">
+      <div class="transcript" id="transcript">
+        <div class="empty-state" id="emptyState">
+          <div class="lights">
+            <div class="light"></div><div class="light"></div><div class="light"></div><div class="light"></div><div class="light"></div>
+          </div>
+          <h3>Lights out, ask away</h3>
+          <p>Connect your RAG backend above, then ask anything about drivers, teams, seasons, circuits, rivalries, or technical regulations.</p>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="composer-inner">
+          <textarea id="msgInput" rows="1" placeholder="Ask about a driver, season, rivalry, or regulation…"></textarea>
+          <button class="send-btn" id="sendBtn">Send</button>
+        </div>
+        <div class="composer-hint">Enter to send &middot; Shift+Enter for new line</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  let endpoint = "";
+  let apiKey = "";
+  let connected = false;
+  let msgCount = 0;
+  let totalLatency = 0;
+  const history = [];
+
+  const statusPill = document.getElementById('statusPill');
+  const statusDot = document.getElementById('statusDot');
+  const statusLabel = document.getElementById('statusLabel');
+  const configPanel = document.getElementById('configPanel');
+  const endpointInput = document.getElementById('endpointInput');
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const testConnBtn = document.getElementById('testConnBtn');
+  const closeConfigBtn = document.getElementById('closeConfigBtn');
+  const transcript = document.getElementById('transcript');
+  const emptyState = document.getElementById('emptyState');
+  const msgInput = document.getElementById('msgInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const statMsgs = document.getElementById('statMsgs');
+  const statAvg = document.getElementById('statAvg');
+  const statEndpoint = document.getElementById('statEndpoint');
+
+  statusPill.addEventListener('click', () => configPanel.classList.toggle('open'));
+  closeConfigBtn.addEventListener('click', () => configPanel.classList.remove('open'));
+
+  document.querySelectorAll('.topic-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      msgInput.value = btn.dataset.q;
+      msgInput.focus();
+    });
+  });
+
+  function setConnected(isOn, label){
+    connected = isOn;
+    statusDot.classList.toggle('live', isOn);
+    statusDot.classList.toggle('off', !isOn);
+    statusLabel.textContent = label || (isOn ? 'Connected' : 'Not Connected');
+  }
+
+  async function testConnection(){
+    endpoint = endpointInput.value.trim();
+    apiKey = apiKeyInput.value.trim();
+    if(!endpoint){
+      setConnected(false, 'No Endpoint Set');
+      return;
+    }
+    statEndpoint.textContent = new URL(endpoint, window.location.href).hostname || 'custom';
+    setConnected(false, 'Testing…');
+    try{
+      const headers = { 'Content-Type': 'application/json' };
+      if(apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query: 'ping', history: [] })
+      });
+      if(res.ok){
+        setConnected(true, 'Connected');
+        configPanel.classList.remove('open');
+      } else {
+        setConnected(false, `Error ${res.status}`);
+      }
+    } catch(e){
+      setConnected(false, 'Unreachable');
+    }
+  }
+  testConnBtn.addEventListener('click', testConnection);
+
+  function autoGrow(){
+    msgInput.style.height = 'auto';
+    msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+  }
+  msgInput.addEventListener('input', autoGrow);
+  msgInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  sendBtn.addEventListener('click', sendMessage);
+
+  function appendUserMessage(text){
+    emptyState.style.display = 'none';
+    const row = document.createElement('div');
+    row.className = 'msg-row user';
+    row.innerHTML = `
+      <div class="msg-meta"><span>You</span></div>
+      <div class="msg-bubble"></div>
+    `;
+    row.querySelector('.msg-bubble').textContent = text;
+    transcript.appendChild(row);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function appendTypingIndicator(){
+    const row = document.createElement('div');
+    row.className = 'msg-row ai';
+    row.id = 'typingRow';
+    row.innerHTML = `
+      <div class="msg-meta"><span>Race Control AI</span></div>
+      <div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>
+    `;
+    transcript.appendChild(row);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function removeTypingIndicator(){
+    const row = document.getElementById('typingRow');
+    if(row) row.remove();
+  }
+
+  function appendAiMessage(text, sources, latencyMs, isError){
+    emptyState.style.display = 'none';
+    const row = document.createElement('div');
+    row.className = 'msg-row ai';
+    const lapTime = (latencyMs/1000).toFixed(3);
+    row.innerHTML = `
+      <div class="msg-meta"><span>Race Control AI</span><span class="lap-time">${lapTime}s</span></div>
+      <div class="msg-bubble ${isError ? 'error' : ''}"></div>
+    `;
+    row.querySelector('.msg-bubble').textContent = text;
+
+    if(sources && sources.length){
+      const srcWrap = document.createElement('div');
+      srcWrap.className = 'sources';
+      sources.forEach(s => {
+        const chip = document.createElement(s.url ? 'a' : 'span');
+        chip.className = 'source-chip';
+        chip.textContent = s.title || s.url || 'Source';
+        if(s.url){ chip.href = s.url; chip.target = '_blank'; chip.rel = 'noopener'; }
+        srcWrap.appendChild(chip);
+      });
+      row.appendChild(srcWrap);
+    }
+
+    transcript.appendChild(row);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  async function sendMessage(){
+    const text = msgInput.value.trim();
+    if(!text) return;
+    if(!endpoint){
+      configPanel.classList.add('open');
+      endpointInput.focus();
+      return;
+    }
+
+    appendUserMessage(text);
+    history.push({ role: 'user', content: text });
+    msgInput.value = '';
+    autoGrow();
+    sendBtn.disabled = true;
+    appendTypingIndicator();
+
+    const start = performance.now();
+    try{
+      const headers = { 'Content-Type': 'application/json' };
+      if(apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query: text, history })
+      });
+
+      const latency = Math.round(performance.now() - start);
+      removeTypingIndicator();
+
+      if(!res.ok){
+        appendAiMessage(`Request failed (HTTP ${res.status}). Check your endpoint and try again.`, null, latency, true);
+        sendBtn.disabled = false;
+        return;
+      }
+
+      const data = await res.json();
+      const answer = data.answer || data.response || data.text || JSON.stringify(data);
+      const sources = data.sources || data.citations || [];
+
+      appendAiMessage(answer, sources, latency, false);
+      history.push({ role: 'assistant', content: answer });
+
+      msgCount++;
+      totalLatency += latency;
+      statMsgs.textContent = msgCount;
+      statAvg.textContent = Math.round(totalLatency / msgCount) + 'ms';
+
+    } catch(e){
+      const latency = Math.round(performance.now() - start);
+      removeTypingIndicator();
+      appendAiMessage('Could not reach the backend. Confirm the endpoint URL is correct and CORS is enabled.', null, latency, true);
+    }
+    sendBtn.disabled = false;
+  }
+
+})();
+</script>
+
+</body>
+</html>
